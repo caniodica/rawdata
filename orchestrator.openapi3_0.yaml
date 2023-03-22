@@ -1,0 +1,450 @@
+openapi: 3.0.0
+info:
+  description: >-
+    IDtools Orchestrator Backend - Mainly used for communciations between
+    IDTools SDKs and a remote service (i.e. IQP)
+  version: 1.0.0-oas3
+  title: IDToolsOrchestrator-Backend API
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+security: 
+      - BearerToken: []
+paths:
+  /device/bind:
+    post:
+      tags:
+        - Device Bind
+      summary: Bind a device to IQP Process ID
+      operationId: bind
+      description: >
+        Creates a bound between a device and a remote resource. Only binded
+        devices will be authorized to access remote resources.
+
+        In order to get a device id you can use
+
+        * **UIDevice.current.identifierForVendor?.uuidString** on iOS 
+
+        * **Settings.Secure.getString(getContentResolver(),
+        Settings.Secure.ANDROID_ID)** on Android
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindDataInput'
+        description: data needed to make a bind
+      responses:
+        '200':
+          description: OK - bind successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BindDataOutput'
+        '400':
+          description: BAD REQUEST - empty or invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BindInvalidBody'
+        '401':
+          description: UNAUTHORIZED - invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidTokenBody'
+  /edoc/verify:
+    put:
+      tags:
+        - EDoc Verify
+      summary: Verify an EDocument Raw Data extracted with EDocID SDK
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EDocRawDataInput'
+        description: data needed to make a bind
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/EDocDataOutputOK'
+                - $ref: '#/components/schemas/EDocDataOutputFake'
+        '400':
+          description: BAD REQUEST - empty or invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EDocInvalidBody'
+        '401':
+          description: UNAUTHORIZED - invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidTokenBody'
+servers:
+  - url: >-
+      https://apistage.infocert.digital/orchestrator/api/v1
+components:
+  securitySchemes:
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT 
+  schemas:
+    BindDataInput:
+      type: object
+      required:
+        - resource_id
+        - rosource_type
+        - device_id
+      properties:
+        resource_id:
+          type: string
+          example: d290f1ee6c544b0190e6d701748f0851
+          description: id of the remote resource to bind device with
+        resource_type:
+          type: string
+          example: process
+          description: type of remote resource
+        device_id:
+          type: string
+          format: uuid
+          example: 223aeab6-9b96-11ec-b909-0242ac120002
+          description: unique device identifier
+        device_name:
+          type: string
+          example: iPhone12_iOS15
+          description: an optional device name (can be useful for logging and statistics)
+    BindDataOutput:
+      type: object
+      properties:
+        message:
+          type: string
+          example: OK - Bind process has made successfully
+          description: describing status message
+        status:
+          type: integer
+          example: 200
+          description: describing status code
+    BindInvalidBody:
+      type: object
+      properties:
+        status:
+            type: number
+            example: 400
+        message:
+          type: string
+          example: BAD REQUEST - Resource id is missing
+    EDocRawDataInput:
+      type: object
+      required:
+        - doc_type
+        - EF_COM
+        - EF_SOD
+        - DG1
+        - DG2
+        - DG14
+      properties:
+        doc_type:
+          type: string
+          enum:
+            - IDCARD
+            - PASSPORT
+          example: IDCARD
+          description: >-
+            Type of the E-Document read with EDocID SDK. Can be \'PASSPORT\' or
+            \'IDCARD\' only
+        EF_COM:
+          type: string
+          example: HL0a+IJKEak88GP7BUa4jw==
+          description: Base64 String representing the EF_COM file of the E-Document
+        EF_SOD:
+          type: string
+          example: NEgiIkeKAVHvhRM0QhsckA==
+          description: Base64 String representing the EF_SOD file of the E-Document
+        DG1:
+          type: string
+          example: OfUsBwvTJ2WvRWG0ZQuCAQ==
+          description: Base64 String representing the DG1 file of the E-Document
+        DG2:
+          type: string
+          example: 82HT8KN+5Y6lUFnG8AKvEw==
+          description: Base64 String representing the DG2 file of the E-Document
+        DG11:
+          type: string
+          example: ey5VfGqyANPiIGlM+G7Wcw==
+          description: >-
+            Base64 String representing the DG11 file of the E-Document, required
+            only if doc_type is IDCARD
+        DG12:
+          type: string
+          example: 3ZiY64zmUwj3EOA/mHRndg==
+          description: >-
+            Base64 String representing the DG12 file of the E-Document, required
+            only if doc_type is IDCARD
+        DG14:
+          type: string
+          example: +ZDL8g2RkwwBA5vbjQ3BlA==
+          description: Base64 String representing the DG14 file of the E-Document"
+    EDocDataOutputOK:
+      type: object
+      properties:
+        status:
+          type: number
+          example: 200
+        data:
+          type: object
+          properties:
+            documentId:
+              type: string
+              example: IDCARD
+            nfcData:
+              type: object
+              properties:
+                document:
+                  type: object
+                  properties:
+                    holder:
+                      type: object
+                      properties:
+                        dateOfBirth:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              format: date
+                              example: '1970-01-01T00:00:00.000Z'
+                            rawDate:
+                              type: string
+                              example: 700101
+                        name:
+                          type: string
+                          example: MARIO
+                        nationality:
+                          type: string
+                          example: ITA
+                        nationalityFullName:
+                          type: string
+                          example: Italy
+                        otherNames:
+                          type: array
+                          items:
+                            type: string
+                          example:
+                            - GIOVANNI
+                            - ALBERTO
+                        photo:
+                          type: string
+                          example: >-
+                            9tn76YFPVas9y0UBifQFcc+E91a+RlMYVo4yhAdad2fP0Tzyx2qb3L2sRQ1kV1a5ja0DDIi5ddDSK6WN8XVDjA==
+                          description: >-
+                            Base64 String representing the photo of the document
+                            owner
+                        sex:
+                          type: string
+                          example: MALE
+                        surname:
+                          type: string
+                          example: ROSSI
+                    info:
+                      type: object
+                      properties:
+                        mrzCode:
+                          type: string
+                          example: C
+                        code:
+                          type: string
+                          example: ID
+                        dateOfExpiry:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              format: date
+                              example: '2032-12-31T00:00:00.000Z'
+                            rawDate:
+                              type: string
+                              example: 321231
+                        dateOfIssue:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              format: date
+                              example: '2020-12-31T00:00:00.000Z'
+                            rawDate:
+                              type: string
+                              example: 201231
+                        issuingAuthority:
+                          type: string
+                          example: MINISTERO DELL'INTERNO
+                        fullUnparsedMRZ:
+                          type: string
+                          example: C<ITACA1234567890<<<<<<<<<<<<<<<....
+                        issuingState:
+                          type: string
+                          example: ITA
+                        issuingStateFullName:
+                          type: string
+                          example: Italy
+                        number:
+                          type: string
+                          example: CA1234567890
+                        additionalInfo:
+                          type: object
+                          properties:
+                            personalNumber:
+                              type: string
+                              example: RSSMRA70A01H501S
+                            fullName:
+                              type: string
+                              example: ROSSI MARI0
+                            fullDateOfBirth:
+                              type: string
+                              example: 19700101
+                            placeOfBirth:
+                              type: string
+                              example: ROMA<RM
+                            permanentAddress:
+                              type: string
+                              example: VIA ROMA123<ROMA<RM
+                securityChecks:
+                  type: object
+                  properties:
+                    integrity:
+                      type: string
+                      enum:
+                        - PASSED
+                        - FAILED
+                      example: PASSED
+                      description: >-
+                        \'PASSED\' if the document data are correct. If
+                        \'FAILED\', no data will be returned
+                    validity:
+                      type: string
+                      enum:
+                        - PASSED
+                        - FAILED
+                      example: PASSED
+                      description: \'PASSED\' if the document is valid
+                    authenticity:
+                      type: string
+                      enum:
+                        - PASSED
+                        - FAILED
+                      example: PASSED
+                      description: >-
+                        \'PASSED\' if it's signed with the issuing authority
+                        certificate
+                    expiration:
+                      type: string
+                      enum:
+                        - PASSED
+                        - FAILED
+                      example: PASSED
+                      description: >-
+                        \'PASSED\' if the document is not expired at the date of
+                        the verification
+                trustLevelReached:
+                  type: string
+                  enum:
+                    - TRUST_LEVEL_NOT_REACHED
+                    - TRUST_LEVEL_0_CHIP_ACCESS_AND_READ_DATA
+                    - TRUST_LEVEL_1_DATA_INTEGRITY_VERIFICATION
+                    - TRUST_LEVEL_2_DOCUMENT_SIGN_VERIFICATION
+                    - TRUST_LEVEL_3_DS_CERTIFICATE_AUTHENTICITY_VERIFICATION
+                  example: TRUST_LEVEL_3_DS_CERTIFICATE_AUTHENTICITY_VERIFICATION
+                  description: TrustLevel mapped from EDocID SDK
+    EDocDataOutputFake:
+      type: object
+      properties:
+        status:
+          type: number
+          example: 200
+        data:
+          type: object
+          properties:
+            documentId:
+              type: string
+              example: IDCARD
+            nfcData:
+              type: object
+              properties:
+                document:
+                  type: object
+                securityChecks:
+                  type: object
+                  properties:
+                    integrity:
+                      type: string
+                      enum:
+                        - PASSED
+                        - FAILED
+                      example: PASSED
+                      description: >-
+                        \'PASSED\' if the document data are correct. If
+                        \'FAILED\', no data will be returned
+                    validity:
+                      type: string
+                      enum:
+                        - PASSED
+                        - FAILED
+                      example: PASSED
+                      description: \'PASSED\' if the document is valid
+                    authenticity:
+                      type: string
+                      enum:
+                        - PASSED
+                        - FAILED
+                      example: PASSED
+                      description: >-
+                        \'PASSED\' if it's signed with the issuing authority
+                        certificate
+                    expiration:
+                      type: string
+                      enum:
+                        - PASSED
+                        - FAILED
+                      example: PASSED
+                      description: >-
+                        \'PASSED\' if the document is not expired at the date of
+                        the verification
+                trustLevelReached:
+                  type: string
+                  enum:
+                    - TRUST_LEVEL_NOT_REACHED
+                    - TRUST_LEVEL_0_CHIP_ACCESS_AND_READ_DATA
+                    - TRUST_LEVEL_1_DATA_INTEGRITY_VERIFICATION
+                    - TRUST_LEVEL_2_DOCUMENT_SIGN_VERIFICATION
+                    - TRUST_LEVEL_3_DS_CERTIFICATE_AUTHENTICITY_VERIFICATION
+                  example: TRUST_LEVEL_3_DS_CERTIFICATE_AUTHENTICITY_VERIFICATION
+                  description: TrustLevel mapped from EDocID SDK
+    EDocInvalidBody:
+      type: object
+      properties:
+        status:
+          type: number
+          example: 400
+        message:
+          type: string
+          example: EF_COM not found in JSON Data
+        exception:
+          type: string
+          example: InvalidJSONError
+        errors:
+          type: string
+          example: Missing EF_COM
+    InvalidTokenBody:
+      type: object
+      properties:
+        error_description:
+          type: string
+          example: The access token is invalid or has expired
+        error:
+          type: string
+          example: invalid_token
+        
+      
